@@ -1,5 +1,6 @@
 const http = require('http');
 const https = require('https');
+const { URL } = require('url');
 
 const CLOSE_API_KEY = 'api_0KHhoYYra8IYfgF4sag2sP.3E6Z9mjuRQgnk83uCIyqQ9';
 const PORT = process.env.PORT || 8080;
@@ -22,14 +23,15 @@ const server = http.createServer((req, res) => {
   }
 
   const closePath = req.url.replace(/^\/api/, '');
+  const closeUrl = new URL('https://api.close.com/api/v1' + closePath);
   const auth = 'Basic ' + Buffer.from(CLOSE_API_KEY + ':').toString('base64');
 
   let body = '';
   req.on('data', chunk => body += chunk);
   req.on('end', () => {
     const options = {
-      hostname: 'api.close.com',
-      path: '/api/v1' + closePath,
+      hostname: closeUrl.hostname,
+      path: closeUrl.pathname + closeUrl.search,
       method: req.method,
       headers: {
         'Authorization': auth,
