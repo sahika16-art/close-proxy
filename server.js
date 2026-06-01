@@ -1,6 +1,5 @@
 const http = require('http');
 const https = require('https');
-const { URL } = require('url');
 
 const CLOSE_API_KEY = 'api_0KHhoYYra8IYfgF4sag2sP.3E6Z9mjuRQgnk83uCIyqQ9';
 const PORT = process.env.PORT || 8080;
@@ -22,25 +21,29 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  const closePath = req.url.replace(/^\/api/, '');
-  const closeUrl = new URL('https://api.close.com/api/v1' + closePath);
+  // Strip /api prefix — keep everything else including query string as-is
+  const closePath = req.url.slice(4); // removes "/api" prefix, keeps /v1/...
   const auth = 'Basic ' + Buffer.from(CLOSE_API_KEY + ':').toString('base64');
 
   let body = '';
   req.on('data', chunk => body += chunk);
   req.on('end', () => {
     const options = {
-      hostname: closeUrl.hostname,
-      path: closeUrl.pathname + closeUrl.search,
+      hostname: 'api.close.com',
+      path: closePath,
       method: req.method,
       headers: {
         'Authorization': auth,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        'Host': 'api.close.com',
       }
     };
 
+    console.log(`Proxying ${req.method} https://api.close.com${closePath}`);
+
     const proxy = https.request(options, closeRes => {
+      console.log(`Close responded: ${closeRes.statusCode}`);
       res.writeHead(closeRes.statusCode, {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
@@ -49,6 +52,7 @@ const server = http.createServer((req, res) => {
     });
 
     proxy.on('error', err => {
+      console.error('Proxy error:', err.message);
       res.writeHead(500, {'Content-Type': 'application/json'});
       res.end(JSON.stringify({error: err.message}));
     });
@@ -59,3 +63,4 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => console.log('Close proxy running on port', PORT));
+  
