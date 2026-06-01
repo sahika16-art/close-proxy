@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 8080;
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -22,9 +22,13 @@ const server = http.createServer((req, res) => {
   }
 
   const auth = 'Basic ' + Buffer.from(CLOSE_API_KEY + ':').toString('base64');
-  let body = '';
-  req.on('data', chunk => body += chunk);
+  
+  // Collect body first, then proxy
+  const chunks = [];
+  req.on('data', chunk => chunks.push(chunk));
   req.on('end', () => {
+    const body = Buffer.concat(chunks);
+    
     const options = {
       hostname: 'api.close.com',
       path: req.url,
@@ -34,9 +38,12 @@ const server = http.createServer((req, res) => {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'Host': 'api.close.com',
+        'Content-Length': body.length,
       }
     };
-    console.log(`-> ${req.method} ${req.url}`);
+
+    console.log(`-> ${req.method} ${req.url} body=${body.length}bytes`);
+
     const proxy = https.request(options, closeRes => {
       console.log(`<- ${closeRes.statusCode}`);
       res.writeHead(closeRes.statusCode, {
@@ -45,11 +52,14 @@ const server = http.createServer((req, res) => {
       });
       closeRes.pipe(res);
     });
+
     proxy.on('error', err => {
+      console.error('Error:', err.message);
       res.writeHead(500, {'Content-Type': 'application/json'});
       res.end(JSON.stringify({error: err.message}));
     });
-    if (body) proxy.write(body);
+
+    if (body.length > 0) proxy.write(body);
     proxy.end();
   });
 });
