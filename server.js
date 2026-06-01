@@ -21,8 +21,8 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Strip /api prefix — keep everything else including query string as-is
-  const closePath = req.url.slice(4); // removes "/api" prefix, keeps /v1/...
+  // /api/v1/activity/... → /api/v1/activity/... (keep as-is, just forward to close)
+  const closePath = req.url; // already starts with /api/v1/...
   const auth = 'Basic ' + Buffer.from(CLOSE_API_KEY + ':').toString('base64');
 
   let body = '';
@@ -63,4 +63,3 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => console.log('Close proxy running on port', PORT));
-  
